@@ -38,7 +38,7 @@ namespace: datadog
 (import (rename-in :gerbil/gambit/os (current-time builtin-current-time)))
 
 (def DEBUG (getenv "DEBUG" #f))
-
+(def none-name "Not set")
 (def program-name "datadog")
 (def datadog-api-key #f)
 (def datadog-app-key #f)
@@ -1349,12 +1349,13 @@ namespace: datadog
   (ao-list (format "layers/~a" app)))
 
 (def (ao-metrics (count 0))
-  (let* ((res (ao-get "metrics" (hash
-				 ("offset" (number->string count)))))
+  (let* ((res
+	  (ao-get "metrics"
+		  (hash
+		   ("offset" (number->string count)))))
 	 (data (from-json res)))
     (when (table? data)
       (let-hash data
-	(displayln (hash->list .query))
 	(let-hash .query
 	  (when (= count 0)
 	    (displayln "| Name | Description | Attributes | source_lag | display_name | period|")
@@ -1364,18 +1365,40 @@ namespace: datadog
 	    (when (table? x)
 	      (let-hash x
 		(displayln "|" .name
-			   "|" .description
-			   "|" .attributes
-			   "|" .source_lag
-			   "|" .display_name
-			   "|" .period "|"))))
+			   "|" (none .description)
+			   "|" (if (table? .attributes)
+				 (let-hash .attributes
+				   (when .?display_units_short
+				     (format " Units: ~a" .display_units_short))
+				   (when .?display_max
+				     (format " DisplayMax:  ~a" .display_max))
+				   (when .?display_min
+				     (format " DisplayMin: ~a" .display_min))
+				   (when .?color
+				     (format " Color: ~a" .color))
+				   (when .?display_units_long
+				     (format " display_units_long: ~a" .display_units_long))
+				   (when .?display_stacked
+				     (format " display_stacked: ~a" .display_stacked))
+				   (when .?summarize_function
+				     (format " summarize_function: ~a" .summarize_function))
+				   (when .?aggregate
+				     (format " aggregate: ~a" .aggregate))
+				   (when .?created_by_ua
+				     (format " Created: ~a" .created_by_ua)))
+				 (none .attributes))
+			   "|" (none .source_lag)
+			   "|" (none .display_name)
+			   "|" (none .period) "|"))))
 	  .metrics)
 	(let-hash .query
 	  (when (> .total (+ .length .offset))
-	    (displayln "recurring for: total: " .total " length:" .length " offset:" .offset)
-	    (ao-metrics (- .total (+ .length .offset)))))))))
+	    (ao-metrics (+ .length .offset))))))))
 
-
+(def (none var)
+  (if (void? var)
+    none-name
+    var))
 
 (def (ao-browsers)
   (ao-list (format "browsers")))
